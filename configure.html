@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}Configure Audit{% endblock %}
+{% block content %}
+{% if current_user.role=='viewer' %}
+<div class="main" style="max-width:580px;text-align:center;padding:60px 20px;">
+  <div style="font-size:56px;margin-bottom:16px;">🔒</div>
+  <h2 style="font-size:20px;font-weight:600;margin-bottom:8px;">Access Restricted</h2>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:24px;">Viewers cannot start audits. Contact an Admin or Auditor.</p>
+  <a href="/dashboard" class="btn btn-s">← Dashboard</a>
+  <a href="/reports" class="btn btn-p" style="margin-left:10px;">View Reports</a>
+</div>
+{% else %}
+<div class="main" style="max-width:900px;">
+  <div class="ph">
+    <h1>Configure Your Audit</h1>
+    <p>Set up security audit parameters. Use the pre-built demo targets for guide presentation.</p>
+  </div>
+
+  <div class="fsec">
+    <div class="fsec-t"><div class="fsec-n">1</div>Select Audit Type</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <label class="rl"><input type="radio" name="at" value="compliance"> 📋 Compliance Audit</label>
+      <label class="rl"><input type="radio" name="at" value="vulnerability"> 🔍 Vulnerability Scan</label>
+      <label class="rl"><input type="radio" name="at" value="combined" checked> ⚡ Combined Audit</label>
+    </div>
+  </div>
+
+  <div class="fsec">
+    <div class="fsec-t"><div class="fsec-n">2</div>Select Target Resources</div>
+    <div style="display:flex;gap:10px;margin-bottom:18px;">
+      <button class="btn btn-p btn-sm" id="tab-cloud" onclick="setTab('cloud')">☁ Cloud (AWS)</button>
+      <button class="btn btn-s btn-sm" id="tab-network" onclick="setTab('network')">🖧 Network / On-Premise</button>
+      <button class="btn btn-s btn-sm" id="tab-app" onclick="setTab('app')">🌐 Application</button>
+    </div>
+
+    <!-- CLOUD -->
+    <div id="t-cloud">
+      <div class="frow">
+        <div>
+          <div style="font-weight:600;font-size:13px;margin-bottom:12px;">Cloud Target</div>
+          <div class="fg">
+            <label class="fl">Demo AWS Account</label>
+            <select class="fs" id="aws-preset" onchange="setCloudTarget(this.value)">
+              <option value="">— Select Demo Account —</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Services to Scan</label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+              <label class="cl"><input type="checkbox" id="s-iam" checked> IAM (Identity &amp; Access Management)</label>
+              <label class="cl"><input type="checkbox" id="s-s3" checked> S3 Buckets</label>
+              <label class="cl"><input type="checkbox" id="s-ec2" checked> EC2 Instances</label>
+              <label class="cl"><input type="checkbox" id="s-rds"> RDS Databases</label>
+              <label class="cl"><input type="checkbox" id="s-lambda"> Lambda Functions</label>
+              <label class="cl"><input type="checkbox" id="s-vpc"> VPC Security Groups</label>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:600;font-size:13px;margin-bottom:12px;">Compliance Frameworks</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+            <label class="cl"><input type="checkbox" id="fw-iso" checked> ISO 27001</label>
+            <label class="cl"><input type="checkbox" id="fw-nist" checked> NIST CSF</label>
+            <label class="cl"><input type="checkbox" id="fw-pci"> PCI DSS</label>
+            <label class="cl"><input type="checkbox" id="fw-gdpr"> GDPR</label>
+            <label class="cl"><input type="checkbox" id="fw-hipaa"> HIPAA</label>
+          </div>
+          <div class="al al-info" style="margin-top:16px;font-size:12px;">
+            <div class="al-icon">☁</div>
+            <div>View the full <a href="/cloud-inventory" style="color:var(--blue);">Cloud Inventory</a> for a detailed AWS asset breakdown for your presentation.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NETWORK -->
+    <div id="t-network" style="display:none;">
+      <div class="al al-info" style="margin-bottom:14px;font-size:12px;">
+        <div class="al-icon">💡</div>
+        <div>Select from pre-built demo targets below, or type a custom IP/CIDR. These are realistic internal network addresses for guide presentation.</div>
+      </div>
+      <div class="frow">
+        <div>
+          <div class="fg">
+            <label class="fl">Demo Target Preset</label>
+            <select class="fs" id="net-preset" onchange="setNetTarget(this.value)">
+              <option value="">— Select Demo Target —</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Target IP / CIDR</label><input class="fi" id="net" placeholder="e.g. 192.168.1.0/24 or 10.0.50.0/24"></div>
+          <div class="fg"><label class="fl">Ports to Scan</label><input class="fi" id="pts" value="22,80,443,3306,3389,8080"></div>
+        </div>
+        <div>
+          <div class="fg"><label class="fl">Host Discovery</label>
+            <select class="fs"><option>ICMP Ping</option><option>TCP SYN Ping</option><option>ARP Scan (LAN)</option></select>
+          </div>
+          <div class="fg"><label class="fl">Scanner Engine</label>
+            <select class="fs"><option>OpenVAS (GVM)</option><option>Nmap + NSE</option><option>Internal Rules</option></select>
+          </div>
+          <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;margin-top:8px;">
+            <div style="font-weight:600;margin-bottom:6px;">Demo IP/URL Reference:</div>
+            <div style="color:var(--muted);line-height:2;">
+              192.168.1.10 — APP-SRV-01<br>
+              192.168.1.44 — DB-SRV-04 (critical)<br>
+              192.168.1.60 — CI-Jenkins<br>
+              192.168.10.0/24 — Prod LAN<br>
+              10.50.0.0/16 — Build Network
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- APP -->
+    <div id="t-app" style="display:none;">
+      <div class="al al-info" style="margin-bottom:14px;font-size:12px;">
+        <div class="al-icon">💡</div>
+        <div>Select from pre-built demo application URLs for guide presentation.</div>
+      </div>
+      <div class="frow">
+        <div>
+          <div class="fg">
+            <label class="fl">Demo App Preset</label>
+            <select class="fs" id="app-preset" onchange="setAppTarget(this.value)">
+              <option value="">— Select Demo App —</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Target URL / IP</label><input class="fi" id="app-t" placeholder="https://app.corp.local"></div>
+          <div class="fg"><label class="fl">Ports</label><input class="fi" id="app-p" placeholder="80, 443, 8080"></div>
+        </div>
+        <div>
+          <div class="fg"><label class="fl">Scan Profile</label>
+            <select class="fs"><option>OWASP Top 10</option><option>API Security</option><option>Full Web Scan</option></select>
+          </div>
+          <div class="fg"><label class="fl">Authentication</label>
+            <select class="fs"><option>None</option><option>Basic Auth</option><option>Bearer Token</option></select>
+          </div>
+          <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;margin-top:8px;">
+            <div style="font-weight:600;margin-bottom:6px;">Demo App URLs:</div>
+            <div style="color:var(--muted);line-height:2;">
+              https://app.corp.local — Web App<br>
+              https://api.corp.local — REST API<br>
+              https://auth.corp.local — Auth/SSO<br>
+              https://ci.corp.local — Jenkins CI<br>
+              https://monitor.corp.local — Grafana
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fsec">
+    <div class="fsec-t"><div class="fsec-n">3</div>Scan Settings</div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Scan Mode</label>
+        <div style="display:flex;gap:20px;margin-top:4px;">
+          <label class="rl"><input type="radio" name="sm" value="manual" checked> Manual Scan</label>
+          <label class="rl"><input type="radio" name="sm" value="scheduled"> Scheduled Scan</label>
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Scan Depth</label>
+        <select class="fs" id="depth">
+          <option value="quick">Quick Scan (~4 findings)</option>
+          <option value="standard" selected>Standard Scan (~8 findings)</option>
+          <option value="full">Full Scan (all CVEs in DB)</option>
+        </select>
+      </div>
+    </div>
+    <div id="sch-wrap" style="display:none;">
+      <div class="frow">
+        <div class="fg"><label class="fl">Schedule</label>
+          <select class="fs"><option>Daily 02:00</option><option>Weekly Mon 02:00</option><option>Monthly 1st 02:00</option></select>
+        </div>
+        <div class="fg"><label class="fl">Notify on completion</label>
+          <select class="fs"><option>Email only</option><option>None</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="frow" style="margin-top:4px;">
+      <div class="fg"><label class="fl">Audit Name (optional)</label>
+        <input class="fi" id="sname" placeholder="e.g. Q4 2025 Production Audit">
+      </div>
+      <div class="fg"><label class="fl">Max Threads</label>
+        <select class="fs"><option value="5">5 (safe)</option><option value="10" selected>10 (balanced)</option><option value="20">20 (aggressive)</option></select>
+      </div>
+    </div>
+    <div class="al al-info" style="margin-top:8px;font-size:12px;">
+      <div class="al-icon">✉️</div>
+      <div>Email alerts are automatically sent to configured recipients when critical/high findings are detected. Configure recipients in <a href="/settings" style="color:var(--blue);">Settings → Email Alerts</a>.</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding-bottom:40px;">
+    <button class="btn btn-p btn-lg" onclick="startAudit()" id="sbtn">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 6l5 3-5 3V6z" fill="currentColor"/></svg>
+      Start Audit
+    </button>
+    <div style="font-size:12px;color:var(--muted);margin-top:10px;">You'll be redirected to the live scan monitor after starting.</div>
+  </div>
+</div>
+
+<div class="moverlay" id="scanModal">
+  <div class="modal" style="width:460px;">
+    <div class="mhd"><span class="mt">🔍 Running Security Audit</span></div>
+    <div class="mbody">
+      <div style="text-align:center;padding:10px 0 20px;">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:16px;" id="slabel">Initializing…</div>
+        <div class="pbar" style="height:10px;border-radius:5px;"><div class="pfill" id="sfill" style="width:0%;background:var(--blue);"></div></div>
+        <div style="font-size:26px;font-family:var(--mono);font-weight:700;color:var(--blue);margin-top:12px;" id="spct">0%</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">Email alerts will fire automatically on critical/high findings</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+let activeTab='cloud', demoTargets={};
+const urlP=new URLSearchParams(window.location.search);
+const tp=urlP.get('type');
+if(tp) document.querySelectorAll('input[name=at]').forEach(r=>{r.checked=r.value===tp;});
+
+async function loadDemoTargets(){
+  const r=await fetch('/api/demo-targets'); demoTargets=await r.json();
+  const cloudSel=document.getElementById('aws-preset');
+  (demoTargets.cloud||[]).forEach(t=>{cloudSel.innerHTML+=`<option value="${t.value}">${t.label} (${t.info})</option>`;});
+  const netSel=document.getElementById('net-preset');
+  (demoTargets.network||[]).forEach(t=>{netSel.innerHTML+=`<option value="${t.value}">${t.label} — ${t.value}</option>`;});
+  const appSel=document.getElementById('app-preset');
+  (demoTargets.app||[]).forEach(t=>{appSel.innerHTML+=`<option value="${t.value}">${t.label} (${t.info})</option>`;});
+}
+function setCloudTarget(v){ if(v) document.getElementById('aws').value=v; }
+function setNetTarget(v){ if(v) document.getElementById('net').value=v; }
+function setAppTarget(v){ if(v){ document.getElementById('app-t').value=v; document.getElementById('app-p').value='443'; }}
+
+// Fix: add aws hidden input for cloud tab
+document.addEventListener('DOMContentLoaded',()=>{
+  if(!document.getElementById('aws')){
+    const inp=document.createElement('input');
+    inp.type='hidden'; inp.id='aws'; inp.value='';
+    document.getElementById('t-cloud').appendChild(inp);
+    // Sync aws-preset to aws hidden
+    document.getElementById('aws-preset').addEventListener('change',function(){
+      document.getElementById('aws').value=this.value;
+    });
+  }
+});
+
+function setTab(t){
+  ['cloud','network','app'].forEach(x=>{
+    document.getElementById('t-'+x).style.display=x===t?'':'none';
+    document.getElementById('tab-'+x).className='btn btn-sm '+(x===t?'btn-p':'btn-s');
+  });
+  activeTab=t;
+}
+document.querySelectorAll('input[name=sm]').forEach(r=>{
+  r.addEventListener('change',()=>document.getElementById('sch-wrap').style.display=r.value==='scheduled'&&r.checked?'':'none');
+});
+
+async function startAudit(){
+  const at=document.querySelector('input[name=at]:checked').value;
+  const sm=document.querySelector('input[name=sm]:checked').value;
+  let target='';
+  if(activeTab==='cloud') target=document.getElementById('aws-preset').value||'aws-prod-123456789';
+  else if(activeTab==='network') target=document.getElementById('net').value||'192.168.1.0/24';
+  else target=document.getElementById('app-t').value||'https://app.corp.local';
+  const svc=['iam','s3','ec2','rds','lambda','vpc'].filter(s=>document.getElementById('s-'+s)?.checked).map(s=>s.toUpperCase());
+  openModal('scanModal');
+  const res=await fetch('/api/scan/start',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:document.getElementById('sname').value||`${at} — ${new Date().toLocaleDateString()}`,
+      audit_type:at,target_type:activeTab,target,
+      ports:document.getElementById('pts')?.value||document.getElementById('app-p')?.value||'80,443,22',
+      scan_mode:sm,scan_depth:document.getElementById('depth').value,
+      aws_account:document.getElementById('aws-preset').value||'',aws_services:svc})});
+  const d=await res.json();
+  if(!d.ok){closeModal('scanModal');toast('Failed to start scan','error');return;}
+  poll(d.job_id);
+}
+function poll(jid){
+  const fill=document.getElementById('sfill'),label=document.getElementById('slabel'),pct=document.getElementById('spct');
+  const iv=setInterval(async()=>{
+    const r=await fetch('/api/scan/'+jid+'/status');
+    const d=await r.json();
+    fill.style.width=d.progress+'%'; pct.textContent=d.progress+'%';
+    if(d.step) label.textContent=d.step;
+    if(d.status==='completed'){clearInterval(iv);setTimeout(()=>window.location='/reports?job='+jid,800);}
+    else if(d.status==='failed'){clearInterval(iv);closeModal('scanModal');toast('Scan failed','error');}
+  },1000);
+}
+loadDemoTargets();
+</script>
+{% endblock %}

@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<div class="main">
+  <div class="flex ic mb6" style="gap:16px;">
+    <div style="flex:1;"><h1 style="font-size:22px;font-weight:600;">Audit Reports</h1><p style="font-size:13px;color:var(--muted);margin-top:3px;" id="rsub">Select a scan to view its report.</p></div>
+    <div class="flex gap2 ic">
+      <select class="fs" id="jsel" onchange="loadReport(this.value)" style="width:290px;">
+        <option value="">— Select a scan —</option>
+      </select>
+      <button class="btn {% if current_user.role!='viewer' %}btn-p{% else %}btn-s{% endif %}" id="pdfbtn" onclick="dlPDF()" style="display:none;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M1 11h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Download PDF
+      </button>
+    </div>
+  </div>
+
+  {% if current_user.role=='viewer' %}
+  <div class="ron">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 7c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z" stroke="currentColor" stroke-width="1.3"/><path d="M1 7c1.5-3 3-4.5 6-4.5S11.5 4 13 7c-1.5 3-3 4.5-6 4.5S2.5 10 1 7z" stroke="currentColor" stroke-width="1.3"/></svg>
+    Read-only view — browse all reports freely. Download PDFs any time. Contact an Auditor or Admin to address findings.
+  </div>
+  {% endif %}
+
+  <div id="no-scan" style="text-align:center;padding:60px 20px;">
+    <div style="font-size:40px;margin-bottom:12px;">📋</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:6px;">No scan selected</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px;">Select a scan from the dropdown above to view its full report.</div>
+    {% if current_user.role!='viewer' %}<a href="/configure" class="btn btn-p">Start New Audit</a>{% endif %}
+  </div>
+
+  <div id="rep-content" style="display:none;">
+    <!-- Metrics row -->
+    <div class="mrow mb6" id="rep-metrics"></div>
+
+    <!-- Info bar -->
+    <div id="scan-info-bar" style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--muted);margin-bottom:16px;display:flex;gap:24px;flex-wrap:wrap;"></div>
+
+    <div class="tabs">
+      <div class="tab active" data-tg="rep" data-tid="vulns" onclick="switchTab('rep','vulns')">🔍 Vulnerabilities</div>
+      <div class="tab" data-tg="rep" data-tid="comp" onclick="switchTab('rep','comp')">📋 Compliance</div>
+      <div class="tab" data-tg="rep" data-tid="summary" onclick="switchTab('rep','summary')">📊 Executive Summary</div>
+    </div>
+
+    <!-- VULNERABILITIES -->
+    <div class="tp active" id="p-rep-vulns">
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Vulnerability Findings</span>
+          <div class="flex gap2" style="flex-wrap:wrap;">
+            <button class="btn btn-s btn-sm sbtn active" onclick="fSev('ALL',this)">All</button>
+            <button class="btn btn-s btn-sm sbtn" onclick="fSev('critical',this)">🔴 Critical</button>
+            <button class="btn btn-s btn-sm sbtn" onclick="fSev('high',this)">🟡 High</button>
+            <button class="btn btn-s btn-sm sbtn" onclick="fSev('medium',this)">🔵 Medium</button>
+            <button class="btn btn-s btn-sm sbtn" onclick="fSev('low',this)">🟢 Low</button>
+            <input class="fi" placeholder="Search CVE / host / title…" oninput="sVulns(this.value)" style="width:200px;padding:5px 10px;font-size:12px;">
+          </div>
+        </div>
+        <div class="tw">
+          <table class="dt">
+            <thead><tr>
+              <th>CVE ID</th><th>Sev</th><th>CVSS</th><th>Title</th>
+              <th>Host / Target</th><th>Service</th><th>Status</th>
+              <th>{% if current_user.role!='viewer' %}Action{% else %}Detail{% endif %}</th>
+            </tr></thead>
+            <tbody id="vtbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPLIANCE -->
+    <div class="tp" id="p-rep-comp">
+      <div class="g3 mb4" id="cscards" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));"></div>
+      <div class="tabs">
+        <div class="tab active" data-tg="fw" data-tid="ISO27001" onclick="switchTab('fw','ISO27001')">ISO 27001</div>
+        <div class="tab" data-tg="fw" data-tid="NIST" onclick="switchTab('fw','NIST')">NIST CSF</div>
+        <div class="tab" data-tg="fw" data-tid="PCI-DSS" onclick="switchTab('fw','PCI-DSS')">PCI-DSS</div>
+      </div>
+      <div class="tp active" id="p-fw-ISO27001">
+        <div class="card"><div class="tw"><table class="dt">
+          <thead><tr><th>Control</th><th>Title</th><th>Description</th><th>Result</th></tr></thead>
+          <tbody id="isotb"></tbody>
+        </table></div></div>
+      </div>
+      <div class="tp" id="p-fw-NIST">
+        <div class="card"><div class="tw"><table class="dt">
+          <thead><tr><th>Control</th><th>Title</th><th>Description</th><th>Result</th></tr></thead>
+          <tbody id="nisttb"></tbody>
+        </table></div></div>
+      </div>
+      <div class="tp" id="p-fw-PCI-DSS">
+        <div class="card"><div class="tw"><table class="dt">
+          <thead><tr><th>Control</th><th>Title</th><th>Description</th><th>Result</th></tr></thead>
+          <tbody id="pcitb"></tbody>
+        </table></div></div>
+      </div>
+    </div>
+
+    <!-- EXECUTIVE SUMMARY -->
+    <div class="tp" id="p-rep-summary">
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Executive Summary</span>
+          <button class="btn btn-p btn-sm" onclick="dlPDF()">
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M1 11h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Export PDF
+          </button>
+        </div>
+        <div class="card-body" id="sumbody"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Remediation / Detail modal -->
+<div class="moverlay" id="remModal">
+  <div class="modal" style="width:600px;">
+    <div class="mhd">
+      <span class="mt" id="remTitle">Finding Details</span>
+      <button class="mx" onclick="closeModal('remModal')">×</button>
+    </div>
+    <div class="mbody" id="rembody"></div>
+    <div class="mft">
+      {% if current_user.role!='viewer' %}
+      <button class="btn btn-p btn-sm" id="fixBtn" onclick="doMarkFixed()">✓ Mark as Fixed</button>
+      {% endif %}
+      <button class="btn btn-s btn-sm" onclick="closeModal('remModal')">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const isViewer = ROLE === 'viewer';
+let curJob = null, allV = [], curFindId = null;
+
+/* ── Load scan list ── */
+async function loadScans(){
+  const r = await fetch('/api/scans');
+  const jobs = await r.json();
+  const sel = document.getElementById('jsel');
+  jobs.forEach(j => {
+    const opt = document.createElement('option');
+    opt.value = j.id;
+    const ts = j.completed ? new Date(j.completed).toLocaleString() : (j.created ? new Date(j.created).toLocaleString() : '');
+    opt.textContent = `${j.name || 'Scan #'+j.id}  [${(j.audit_type||'').toUpperCase()}]  ${j.target ? '→ '+j.target : ''}  (${ts})`;
+    sel.appendChild(opt);
+  });
+  // Auto-load from URL param
+  const urlP = new URLSearchParams(window.location.search);
+  const jid = urlP.get('job');
+  if(jid){ sel.value = jid; loadReport(jid); }
+}
+
+/* ── Load a specific report ── */
+async function loadReport(jid){
+  if(!jid){ document.getElementById('no-scan').style.display=''; document.getElementById('rep-content').style.display='none'; document.getElementById('pdfbtn').style.display='none'; return; }
+  curJob = jid;
+  document.getElementById('no-scan').style.display = 'none';
+  document.getElementById('rep-content').style.display = 'block';
+  document.getElementById('pdfbtn').style.display = '';
+  document.getElementById('rep-metrics').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px;">Loading report…</div>';
+  document.getElementById('vtbody').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted);">Loading…</td></tr>';
+
+  const r = await fetch(`/api/scan/${jid}/results`);
+  const d = await r.json();
+  if(d.error){ document.getElementById('rep-metrics').innerHTML = `<div style="color:var(--red);">${d.error}</div>`; return; }
+
+  const sc = d.sev_counts || {};
+  allV = d.vulnerabilities || [];
+  const scores = d.compliance_scores || {};
+  const riskColor = d.risk_score >= 70 ? 'green' : d.risk_score >= 40 ? 'amber' : 'red';
+
+  document.getElementById('rsub').textContent = `Report for: ${d.job.name || 'Scan #'+jid}`;
+
+  // Scan info bar
+  document.getElementById('scan-info-bar').innerHTML = [
+    d.job.target ? `<span>🎯 <strong>Target:</strong> ${d.job.target}</span>` : '',
+    d.job.audit_type ? `<span>🔬 <strong>Type:</strong> ${d.job.audit_type.toUpperCase()}</span>` : '',
+    d.job.completed ? `<span>🕐 <strong>Completed:</strong> ${new Date(d.job.completed).toLocaleString()}</span>` : '',
+    `<span>📊 <strong>Risk Score:</strong> <strong style="color:var(--${riskColor})">${d.risk_score}/100</strong></span>`,
+  ].filter(Boolean).join('');
+
+  // Metrics row
+  document.getElementById('rep-metrics').innerHTML = `
+    <div class="mc ${riskColor}"><div class="ml">Risk Score</div><div class="mv ${riskColor}">${d.risk_score}</div><div class="ms">out of 100</div></div>
+    <div class="mc red"><div class="ml">Vulnerabilities</div><div class="mv red">${allV.length}</div><div class="ms">${sc.critical||0} critical · ${sc.high||0} high</div></div>
+    <div class="mc ${(scores.ISO27001||0)>=70?'green':'amber'}"><div class="ml">ISO 27001</div><div class="mv ${(scores.ISO27001||0)>=70?'green':'amber'}">${scores.ISO27001!=null?scores.ISO27001+'%':'—'}</div><div class="ms">compliance score</div></div>
+    <div class="mc ${(scores.NIST||0)>=70?'green':'amber'}"><div class="ml">NIST CSF</div><div class="mv ${(scores.NIST||0)>=70?'green':'amber'}">${scores.NIST!=null?scores.NIST+'%':'—'}</div><div class="ms">compliance score</div></div>`;
+
+  renderV(allV);
+  renderComp(d.compliance || [], scores);
+  renderSum(d, sc);
+}
+
+/* ── Render vulnerability table ── */
+function renderV(vulns){
+  const tb = document.getElementById('vtbody');
+  if(!vulns.length){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">✅ No vulnerabilities found for this filter.</td></tr>'; return; }
+  tb.innerHTML = vulns.map(v => `
+    <tr data-sev="${v.severity}" data-id="${v.id}">
+      <td class="mono" style="color:var(--blue);">${v.cve||'N/A'}</td>
+      <td><span class="badge b-${v.severity}">${v.severity.toUpperCase()}</span></td>
+      <td style="font-family:var(--mono);font-weight:700;color:${v.cvss>=9?'var(--red)':v.cvss>=7?'var(--amber)':'var(--text)'};">${v.cvss||'—'}</td>
+      <td style="font-weight:500;max-width:220px;font-size:12px;">${v.title}</td>
+      <td class="mono">${v.host||'—'}</td>
+      <td style="font-size:12px;">${v.service||'—'}</td>
+      <td><span class="badge b-${v.status==='fixed'?'pass':v.status==='open'?'fail':'medium'}">${(v.status||'open').toUpperCase()}</span></td>
+      <td><button class="btn btn-s btn-sm" onclick="showRem(${v.id},'${v.cve||''}','${v.title.replace(/'/g,"\\'")}','${v.severity}','${v.host||''}','${v.cvss||''}')">
+        ${isViewer?'Details':'Remediate'}
+      </button></td>
+    </tr>`).join('');
+}
+
+/* ── Filter by severity ── */
+function fSev(sev,btn){
+  document.querySelectorAll('.sbtn').forEach(b=>b.classList.remove('active','btn-p'));
+  btn.classList.add('active','btn-p');
+  renderV(sev==='ALL'?allV:allV.filter(v=>v.severity===sev));
+}
+
+/* ── Search vulnerabilities ── */
+function sVulns(q){
+  q = q.toLowerCase();
+  renderV(allV.filter(v=>(v.cve||'').toLowerCase().includes(q)||(v.title||'').toLowerCase().includes(q)||(v.host||'').toLowerCase().includes(q)||(v.service||'').toLowerCase().includes(q)));
+}
+
+/* ── Render compliance tables ── */
+function renderComp(checks, scores){
+  // Scores cards
+  const allScores = {'ISO27001':'ISO 27001','NIST':'NIST CSF','PCI-DSS':'PCI-DSS'};
+  document.getElementById('cscards').innerHTML = Object.entries(allScores).map(([fw,label])=>{
+    const sc = scores[fw];
+    if(sc == null) return `<div class="card"><div class="card-body" style="text-align:center;"><div style="font-size:13px;font-weight:600;margin-bottom:8px;">${label}</div><div style="color:var(--muted);font-size:12px;">Not included in this scan</div></div></div>`;
+    const col = sc>=70?'#10b981':sc>=50?'#f59e0b':'#ef4444';
+    return `<div class="card"><div class="card-body">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;">${label}</div>
+      <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:${col};margin-bottom:8px;">${sc}%</div>
+      <div class="cbt"><div class="cbf" style="width:${sc}%;background:${col};"></div></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">${checks.filter(c=>c.framework===fw&&c.status==='pass').length} / ${checks.filter(c=>c.framework===fw).length} controls passed</div>
+    </div></div>`;
+  }).join('');
+
+  // Per-framework tables
+  const tbMap = {'ISO27001':'isotb','NIST':'nisttb','PCI-DSS':'pcitb'};
+  Object.entries(tbMap).forEach(([fw, tbid])=>{
+    const tb = document.getElementById(tbid);
+    const fc = checks.filter(c=>c.framework===fw);
+    if(!fc.length){
+      tb.innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted);">Not included in this scan type. Run a Combined or Compliance audit.</td></tr>';
+      return;
+    }
+    tb.innerHTML = fc.map(c=>`
+      <tr>
+        <td class="mono" style="white-space:nowrap;">${c.control_id}</td>
+        <td style="font-weight:500;font-size:12px;">${c.title}</td>
+        <td style="font-size:11px;color:var(--muted);max-width:300px;">${c.description}</td>
+        <td><span class="badge b-${c.status}">${c.status==='pass'?'✓ PASS':'✗ FAIL'}</span></td>
+      </tr>`).join('');
+  });
+}
+
+/* ── Executive Summary ── */
+function renderSum(d, sc){
+  const risk = d.risk_score;
+  const riskLabel = risk>=80?'Low Risk':risk>=60?'Moderate Risk':risk>=40?'High Risk':'Critical Risk';
+  const riskColor = risk>=70?'var(--green)':risk>=40?'var(--amber)':'var(--red)';
+  document.getElementById('sumbody').innerHTML=`
+    <div style="margin-bottom:24px;">
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;background:var(--bg);border-radius:10px;padding:18px;">
+        <div style="text-align:center;">
+          <div style="font-size:48px;font-weight:800;font-family:var(--mono);color:${riskColor};line-height:1;">${risk}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">/ 100</div>
+          <div style="font-size:12px;font-weight:700;color:${riskColor};margin-top:6px;">${riskLabel}</div>
+        </div>
+        <div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:10px;">Scan: ${d.job.name || 'Security Audit'}</div>
+          <div style="font-size:12px;color:var(--muted);line-height:2;">
+            🎯 Target: <strong>${d.job.target||'N/A'}</strong><br>
+            🔬 Audit Type: <strong>${(d.job.audit_type||'').toUpperCase()}</strong><br>
+            🕐 Completed: <strong>${d.job.completed ? new Date(d.job.completed).toLocaleString() : 'N/A'}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:24px;">
+      <h3 style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);">Severity Breakdown</h3>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+        ${['critical','high','medium','low'].map(s=>`
+          <div style="text-align:center;background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);">
+            <div style="font-family:var(--mono);font-size:28px;font-weight:800;color:${s==='critical'?'#dc2626':s==='high'?'#d97706':s==='medium'?'#2563eb':'#16a34a'};">${sc[s]||0}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">${s}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    ${Object.keys(d.compliance_scores||{}).length ? `
+    <div style="margin-bottom:24px;">
+      <h3 style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);">Compliance Scores</h3>
+      ${Object.entries(d.compliance_scores).map(([fw,score])=>{
+        const col=score>=70?'#10b981':score>=50?'#f59e0b':'#ef4444';
+        return `<div class="cbw" style="margin-bottom:10px;">
+          <div class="cbh"><span style="font-weight:500;">${fw==='ISO27001'?'ISO 27001':fw}</span><span style="font-family:var(--mono);font-weight:700;color:${col};">${score}%</span></div>
+          <div class="cbt"><div class="cbf" style="width:${score}%;background:${col};"></div></div>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
+    <div>
+      <h3 style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);">Priority Remediation Items</h3>
+      ${(d.vulnerabilities||[]).filter(v=>v.severity==='critical').slice(0,5).map((v,i)=>`
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;">
+          <span style="font-weight:800;color:var(--red);min-width:20px;">${i+1}.</span>
+          <div style="flex:1;">
+            <span style="font-weight:600;">${v.title}</span>
+            <span style="color:var(--muted);"> — ${v.host||'Multiple hosts'}</span>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--blue);margin-left:6px;">${v.cve||''}</span>
+          </div>
+          <span style="color:var(--red);font-size:11px;font-weight:700;white-space:nowrap;">Patch within 24h</span>
+        </div>`).join('') || '<div style="color:var(--green);font-size:13px;padding:10px 0;">✅ No critical findings detected.</div>'}
+    </div>`;
+}
+
+/* ── Show Remediation modal ── */
+async function showRem(id, cve, title, sev, host, cvss){
+  curFindId = id;
+  document.getElementById('remTitle').textContent = isViewer ? 'Finding Details' : 'Remediation Guidance';
+  document.getElementById('rembody').innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;">Loading…</div>';
+  if(!isViewer) document.getElementById('fixBtn').disabled = false;
+  openModal('remModal');
+
+  let guidance = 'Review vendor advisory and apply latest patches.';
+  if(cve){
+    try {
+      const r = await fetch(`/api/remediation/${cve}`);
+      const d = await r.json();
+      guidance = d.guidance || guidance;
+    } catch(e){}
+  }
+  const sevColor = {'critical':'var(--red)','high':'var(--amber)','medium':'var(--blue)','low':'var(--green)'}[sev]||'var(--muted)';
+  document.getElementById('rembody').innerHTML = `
+    <div style="background:var(--bg);border-radius:8px;padding:14px 16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:12px;">
+      <div><div style="color:var(--muted);margin-bottom:3px;">CVE ID</div><div style="font-family:var(--mono);color:var(--blue);font-weight:600;">${cve||'N/A'}</div></div>
+      <div><div style="color:var(--muted);margin-bottom:3px;">Severity</div><div><span class="badge b-${sev}">${(sev||'').toUpperCase()}</span></div></div>
+      <div><div style="color:var(--muted);margin-bottom:3px;">CVSS Score</div><div style="font-family:var(--mono);font-weight:700;color:${sevColor};">${cvss||'—'} / 10</div></div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">${title}</div>
+      ${host ? `<div style="font-size:11px;color:var(--muted);">Affected host: <span style="font-family:var(--mono);color:var(--blue);">${host}</span></div>` : ''}
+    </div>
+    <div style="margin-bottom:0;">
+      <h4 style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">${isViewer?'Guidance':'Remediation Steps'}</h4>
+      <div style="font-size:13px;line-height:1.8;color:var(--text);background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;">${guidance}</div>
+    </div>
+    ${isViewer?'<div class="ron" style="margin-top:14px;">Only Admins and Auditors can mark findings as fixed.</div>':''}`;
+}
+
+/* ── Mark finding as fixed ── */
+async function doMarkFixed(){
+  if(!curFindId || isViewer) return;
+  document.getElementById('fixBtn').disabled = true;
+  const r = await fetch(`/api/result/${curFindId}/fix`, {method:'POST'});
+  const d = await r.json();
+  if(d.ok){
+    // Update badge in table
+    const row = document.querySelector(`tr[data-id="${curFindId}"]`);
+    if(row){ const badge = row.querySelector('td:nth-child(7) .badge'); if(badge){badge.textContent='FIXED';badge.className='badge b-pass';} }
+    // Update allV array
+    const v = allV.find(x=>x.id===curFindId); if(v) v.status='fixed';
+    closeModal('remModal');
+    toast('Finding marked as fixed', 'success');
+  } else {
+    toast('Failed to update: '+(d.error||'Unknown error'), 'error');
+    document.getElementById('fixBtn').disabled = false;
+  }
+}
+
+function dlPDF(){ if(!curJob) return; window.open(`/api/report/${curJob}/pdf`); }
+loadScans();
+</script>
+{% endblock %}

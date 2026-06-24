@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+
+{% if current_user.role=='viewer' %}
+<div class="main" style="max-width:580px;text-align:center;padding:60px 20px;">
+  <div style="font-size:56px;margin-bottom:16px;">⚙️</div>
+  <h2 style="font-size:20px;font-weight:600;margin-bottom:8px;">Settings — Restricted</h2>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:24px;">Viewers cannot access settings.</p>
+  <a href="/dashboard" class="btn btn-s">← Dashboard</a>
+</div>
+{% else %}
+<div class="main">
+  <div class="ph">
+    <h1>Settings</h1>
+    <p>{% if current_user.role=='admin' %}Manage users, configure email alerts, and compliance rules.{% else %}Manage compliance rules.{% endif %}</p>
+  </div>
+
+  <div class="tabs">
+    {% if current_user.role=='admin' %}
+    <div class="tab active" data-tg="s" data-tid="email" onclick="switchTab('s','email')">✉️ Email Alerts</div>
+    <div class="tab" data-tg="s" data-tid="users" onclick="switchTab('s','users')">👥 Users</div>
+    {% endif %}
+    <div class="tab {% if current_user.role=='auditor' %}active{% endif %}" data-tg="s" data-tid="rules" onclick="switchTab('s','rules')">📋 Compliance Rules</div>
+    {% if current_user.role=='admin' %}
+    <div class="tab" data-tg="s" data-tid="int" onclick="switchTab('s','int')">🔗 Integrations</div>
+    {% endif %}
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       EMAIL ALERTS  (admin only) — Simple 3-step wizard
+  ══════════════════════════════════════════════════════ -->
+  {% if current_user.role=='admin' %}
+  <div class="tp active" id="p-s-email">
+
+    <!-- Status banner -->
+    <div id="email-status-bar" style="display:none;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:20px;display:flex;align-items:center;gap:10px;"></div>
+
+    <!-- STEP 1 — Choose Provider -->
+    <div class="card mb4">
+      <div class="card-hd">
+        <span class="card-title">Step 1 — Choose Your Email Provider</span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;" id="provider-grid">
+          <!-- filled by JS -->
+        </div>
+        <div id="provider-note" style="margin-top:14px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1e40af;display:none;"></div>
+      </div>
+    </div>
+
+    <!-- STEP 2 — Credentials -->
+    <div class="card mb4">
+      <div class="card-hd"><span class="card-title">Step 2 — Enter Your Email Credentials</span></div>
+      <div class="card-body">
+        <div class="frow">
+          <div class="fg">
+            <label class="fl">Your Email Address</label>
+            <input class="fi" id="smtp-user" type="email" placeholder="you@gmail.com">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">This is the email FalconX will send alerts from.</div>
+          </div>
+          <div class="fg">
+            <label class="fl">Password / App Password</label>
+            <input class="fi" id="smtp-pass" type="password" placeholder="Enter password or app password">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;" id="pass-hint">For Gmail: use an App Password, not your main password.</div>
+          </div>
+        </div>
+        <div class="fg" style="margin-top:4px;">
+          <label class="fl">Display Name (optional)</label>
+          <input class="fi" id="smtp-from" placeholder="FalconX Security Alerts <you@gmail.com>">
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">How the sender name appears in the email inbox.</div>
+        </div>
+        <div style="margin-top:10px;padding:10px 14px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);" id="smtp-auto-info">
+          SMTP details will be filled automatically based on your selected provider.
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 — Recipients + Enable -->
+    <div class="card mb4">
+      <div class="card-hd">
+        <span class="card-title">Step 3 — Add Alert Recipients</span>
+        <button class="btn btn-p btn-sm" onclick="openModal('recModal')">+ Add Email</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div id="reclist" style="padding:12px 20px;font-size:13px;color:var(--muted);">Loading…</div>
+        <div style="padding:12px 20px;border-top:1px solid var(--border);">
+          <label class="cl" style="font-size:13px;font-weight:600;color:var(--text);">
+            <input type="checkbox" id="smtp-enabled" style="width:16px;height:16px;">
+            Enable email alerts — automatically send alerts when critical/high vulnerabilities are found
+          </label>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;margin-left:24px;">Alerts are sent to all recipients above immediately after a scan completes with critical/high findings.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save + Test -->
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+      <button class="btn btn-p" onclick="saveEmailConfig()">💾 Save Email Settings</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input class="fi" id="test-to" type="email" placeholder="test@yourmail.com" style="width:220px;">
+        <button class="btn btn-s" onclick="sendTestEmail()">📧 Send Test Email</button>
+      </div>
+      <div id="test-result" style="font-size:12px;display:none;"></div>
+    </div>
+
+    <!-- Gmail App Password Guide -->
+    <div class="card">
+      <div class="card-hd" style="cursor:pointer;" onclick="toggleGuide()">
+        <span class="card-title">📖 How to get a Gmail App Password (step-by-step)</span>
+        <span id="guide-arrow" style="color:var(--muted);font-size:12px;">▼ Show</span>
+      </div>
+      <div id="guide-body" style="display:none;padding:20px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+          <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;">
+            <div style="font-weight:700;margin-bottom:6px;font-size:13px;">1. Enable 2-Step Verification</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">Go to <strong>myaccount.google.com</strong> → Security → 2-Step Verification → Turn On</div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;">
+            <div style="font-weight:700;margin-bottom:6px;font-size:13px;">2. Create App Password</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">Go to <strong>myaccount.google.com</strong> → Security → App Passwords → Select "Mail" → Generate</div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;">
+            <div style="font-weight:700;margin-bottom:6px;font-size:13px;">3. Copy the 16-character code</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">You'll see a 16-character password like <strong>abcd efgh ijkl mnop</strong>. Enter it without spaces as your password above.</div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;">
+            <div style="font-weight:700;margin-bottom:6px;font-size:13px;">4. Direct URL</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">Shortcut: visit <strong>myaccount.google.com/apppasswords</strong> directly (requires 2FA to be enabled first)</div>
+          </div>
+        </div>
+        <div class="al al-info" style="margin-top:14px;font-size:12px;">
+          <div class="al-icon">ℹ</div>
+          <div>For <strong>Outlook</strong>: Settings → View all Outlook settings → Mail → Sync email → Find POP/IMAP details. For <strong>SendGrid</strong>: Username is always <code>apikey</code> and password is your API key from sendgrid.com/settings/api_keys.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       USERS  (admin only)
+  ══════════════════════════════════════════════════════ -->
+  <div class="tp" id="p-s-users">
+    <div class="card mb4">
+      <div class="card-hd">
+        <span class="card-title">User Accounts</span>
+        <button class="btn btn-p btn-sm" onclick="openModal('nuModal')">+ Add User</button>
+      </div>
+      <div style="display:flex;gap:16px;padding:10px 20px;background:#f8fafc;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap;">
+        <div><span class="badge b-admin">ADMIN</span> Full access, users, email config</div>
+        <div><span class="badge b-auditor">AUDITOR</span> Run scans, manage rules</div>
+        <div><span class="badge b-viewer">VIEWER</span> Read-only reports</div>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Last Login</th><th>Actions</th></tr></thead>
+        <tbody id="utbody"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted);">Loading…</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ══════════════════════════════════════════════════════
+       COMPLIANCE RULES  (admin + auditor)
+  ══════════════════════════════════════════════════════ -->
+  <div class="tp {% if current_user.role=='auditor' %}active{% endif %}" id="p-s-rules">
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Compliance Rules</span>
+        <button class="btn btn-p btn-sm" onclick="openModal('ruleModal');resetRule()">+ New Rule</button>
+      </div>
+      <div style="display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+        <button class="btn btn-s btn-sm fwb active" onclick="fwFilt('ALL',this)">All</button>
+        <button class="btn btn-s btn-sm fwb" onclick="fwFilt('ISO27001',this)">ISO 27001</button>
+        <button class="btn btn-s btn-sm fwb" onclick="fwFilt('NIST',this)">NIST CSF</button>
+        <button class="btn btn-s btn-sm fwb" onclick="fwFilt('PCI-DSS',this)">PCI-DSS</button>
+        <input class="fi" placeholder="Search…" oninput="srRules(this.value)" style="width:180px;padding:5px 10px;font-size:12px;margin-left:auto;">
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Framework</th><th>Control ID</th><th>Title</th><th>Type</th><th>Severity</th><th>On/Off</th><th>Actions</th></tr></thead>
+        <tbody id="rtbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">Loading…</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       INTEGRATIONS  (admin only)
+  ══════════════════════════════════════════════════════ -->
+  {% if current_user.role=='admin' %}
+  <div class="tp" id="p-s-int">
+    <div class="g2">
+      <div class="card">
+        <div class="card-hd"><span class="card-title">OpenVAS / GVM</span></div>
+        <div class="card-body">
+          <div class="fg"><label class="fl">GVM Host</label><input class="fi" value="localhost"></div>
+          <div class="fg"><label class="fl">Port</label><input class="fi" value="9390"></div>
+          <div class="fg"><label class="fl">Username</label><input class="fi" value="admin"></div>
+          <div class="fg"><label class="fl">Password</label><input class="fi" type="password" value="admin"></div>
+          <button class="btn btn-s btn-sm" onclick="toast('Configure real credentials for production.','warning')">Test Connection</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><span class="card-title">AWS Integration</span></div>
+        <div class="card-body">
+          <div class="fg"><label class="fl">Access Key ID</label><input class="fi" placeholder="AKIA…"></div>
+          <div class="fg"><label class="fl">Secret Access Key</label><input class="fi" type="password" placeholder="••••••••"></div>
+          <div class="fg"><label class="fl">Default Region</label>
+            <select class="fs"><option>ap-south-1</option><option>us-east-1</option><option>eu-west-1</option></select>
+          </div>
+          <div class="al al-info" style="font-size:12px;"><div class="al-icon">ℹ</div><div>Requires IAM roles: SecurityAudit, ViewOnlyAccess.</div></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-p" onclick="toast('Integration settings saved','success')">Save Integrations</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ═══ MODALS ═══ -->
+{% if current_user.role=='admin' %}
+<div class="moverlay" id="nuModal">
+  <div class="modal">
+    <div class="mhd"><span class="mt">Add New User</span><button class="mx" onclick="closeModal('nuModal')">×</button></div>
+    <div class="mbody">
+      <div class="fg"><label class="fl">Username</label><input class="fi" id="nu-u"></div>
+      <div class="fg"><label class="fl">Email</label><input class="fi" id="nu-e" type="email"></div>
+      <div class="fg"><label class="fl">Password</label><input class="fi" id="nu-p" type="password"></div>
+      <div class="fg"><label class="fl">Role</label>
+        <select class="fs" id="nu-r">
+          <option value="viewer">Viewer — read-only reports</option>
+          <option value="auditor">Auditor — run scans &amp; manage rules</option>
+          <option value="admin">Admin — full access</option>
+        </select>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn btn-p btn-sm" onclick="createUser()">Create User</button>
+      <button class="btn btn-s btn-sm" onclick="closeModal('nuModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="moverlay" id="recModal">
+  <div class="modal" style="width:440px;">
+    <div class="mhd"><span class="mt">Add Alert Recipient</span><button class="mx" onclick="closeModal('recModal')">×</button></div>
+    <div class="mbody">
+      <div class="fg"><label class="fl">Email Address</label><input class="fi" id="rec-email" type="email" placeholder="security@yourcompany.com"></div>
+      <div class="fg"><label class="fl">Alert on</label>
+        <select class="fs" id="rec-sev">
+          <option value="critical,high">Critical &amp; High findings</option>
+          <option value="critical">Critical only</option>
+          <option value="critical,high,medium">Critical, High &amp; Medium</option>
+        </select>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn btn-p btn-sm" onclick="addRecipient()">Add Recipient</button>
+      <button class="btn btn-s btn-sm" onclick="closeModal('recModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="moverlay" id="ruleModal">
+  <div class="modal">
+    <div class="mhd"><span class="mt" id="rmtitle">New Compliance Rule</span><button class="mx" onclick="closeModal('ruleModal')">×</button></div>
+    <div class="mbody">
+      <input type="hidden" id="r-id">
+      <div class="frow">
+        <div class="fg"><label class="fl">Framework</label>
+          <select class="fs" id="r-fw">
+            <option value="ISO27001">ISO 27001</option><option value="NIST">NIST CSF</option>
+            <option value="PCI-DSS">PCI-DSS</option><option value="GDPR">GDPR</option><option value="CUSTOM">Custom</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Control ID</label><input class="fi" id="r-cid" placeholder="e.g. A.9.1"></div>
+      </div>
+      <div class="fg"><label class="fl">Title</label><input class="fi" id="r-title"></div>
+      <div class="fg"><label class="fl">Description</label><textarea class="fta" id="r-desc" rows="2"></textarea></div>
+      <div class="frow">
+        <div class="fg"><label class="fl">Check Type</label>
+          <select class="fs" id="r-ct"><option value="policy">Policy</option><option value="config">Config</option><option value="patch">Patch</option><option value="manual">Manual</option></select>
+        </div>
+        <div class="fg"><label class="fl">Severity</label>
+          <select class="fs" id="r-sev"><option value="critical">Critical</option><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="mft">
+      <button class="btn btn-p btn-sm" onclick="saveRule()">Save Rule</button>
+      <button class="btn btn-s btn-sm" onclick="closeModal('ruleModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const isAdmin = ROLE === 'admin';
+let allRules = [], editRuleId = null, selectedProvider = 'gmail';
+let providerData = {};
+
+/* ─── EMAIL PROVIDER UI ─── */
+const PROVIDER_ICONS = {gmail:'G',outlook:'O',yahoo:'Y',sendgrid:'SG',mailgun:'MG',custom:'⚙'};
+const PROVIDER_LABELS = {gmail:'Gmail',outlook:'Outlook',yahoo:'Yahoo',sendgrid:'SendGrid',mailgun:'Mailgun',custom:'Custom'};
+const PROVIDER_COLORS = {gmail:'#ea4335',outlook:'#0078d4',yahoo:'#6001d2',sendgrid:'#1a82e2',mailgun:'#f06',custom:'#64748b'};
+
+async function initEmailUI(){
+  if(!isAdmin) return;
+  const r = await fetch('/api/email-providers');
+  providerData = await r.json();
+  const grid = document.getElementById('provider-grid');
+  grid.innerHTML = Object.keys(providerData).map(p=>`
+    <div onclick="selectProvider('${p}')" id="pcard-${p}" style="
+      border:2px solid var(--border);border-radius:10px;padding:14px 10px;
+      text-align:center;cursor:pointer;transition:all .15s;background:var(--surface);">
+      <div style="width:36px;height:36px;border-radius:8px;background:${PROVIDER_COLORS[p]};
+        color:#fff;font-weight:800;font-size:12px;margin:0 auto 8px;
+        display:flex;align-items:center;justify-content:center;">${PROVIDER_ICONS[p]||p[0].toUpperCase()}</div>
+      <div style="font-size:12px;font-weight:600;">${PROVIDER_LABELS[p]||p}</div>
+    </div>`).join('');
+  loadEmailConfig();
+}
+
+function selectProvider(p){
+  selectedProvider = p;
+  document.querySelectorAll('[id^="pcard-"]').forEach(el=>{
+    el.style.borderColor='var(--border)'; el.style.background='var(--surface)';
+  });
+  const card = document.getElementById('pcard-'+p);
+  card.style.borderColor = PROVIDER_COLORS[p] || 'var(--blue)';
+  card.style.background = (PROVIDER_COLORS[p]||'#3b82f6')+'11';
+  const info = providerData[p];
+  const noteEl = document.getElementById('provider-note');
+  noteEl.style.display = '';
+  noteEl.innerHTML = `<strong>${PROVIDER_LABELS[p]}</strong>: ${info.note}`;
+  document.getElementById('pass-hint').textContent = info.note.split('.')[0]+'.';
+  const infoEl = document.getElementById('smtp-auto-info');
+  if(p === 'custom'){
+    infoEl.innerHTML = `Custom provider: enter your SMTP host and port manually.`;
+  } else {
+    infoEl.innerHTML = `SMTP settings auto-configured: <strong>${info.host}</strong> port <strong>${info.port}</strong> with STARTTLS.`;
+  }
+}
+
+async function loadEmailConfig(){
+  if(!isAdmin) return;
+  const r = await fetch('/api/email-config');
+  const d = await r.json();
+  if(d.smtp_user) document.getElementById('smtp-user').value = d.smtp_user;
+  if(d.from_addr) document.getElementById('smtp-from').value = d.from_addr;
+  document.getElementById('smtp-enabled').checked = !!d.enabled;
+  const provider = d.provider || 'gmail';
+  selectProvider(provider);
+  const bar = document.getElementById('email-status-bar');
+  if(d.enabled && d.smtp_host){
+    bar.style.display='flex'; bar.style.background='#f0fdf4'; bar.style.border='1px solid #bbf7d0'; bar.style.color='#166534';
+    bar.innerHTML='<span style="font-size:18px;">✅</span><div><strong>Email alerts are active.</strong> Alerts will fire automatically on critical/high scan findings.</div>';
+  } else if(d.smtp_host && !d.enabled){
+    bar.style.display='flex'; bar.style.background='#fffbeb'; bar.style.border='1px solid #fde68a'; bar.style.color='#92400e';
+    bar.innerHTML='<span style="font-size:18px;">⚠️</span><div><strong>Email configured but disabled.</strong> Check "Enable email alerts" and click Save to activate.</div>';
+  } else {
+    bar.style.display='flex'; bar.style.background='#f8fafc'; bar.style.border='1px solid var(--border)'; bar.style.color='var(--muted)';
+    bar.innerHTML='<span style="font-size:16px;">💡</span><div>Follow the 3 steps below to set up automatic security alert emails.</div>';
+  }
+}
+
+async function saveEmailConfig(){
+  const payload = {
+    provider: selectedProvider,
+    smtp_user: document.getElementById('smtp-user').value.trim(),
+    smtp_pass: document.getElementById('smtp-pass').value,
+    from_addr: document.getElementById('smtp-from').value.trim(),
+    enabled:   document.getElementById('smtp-enabled').checked,
+    use_tls: 1,
+  };
+  if(!payload.smtp_user){ toast('Enter your email address first','warning'); return; }
+  const r = await fetch('/api/email-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d = await r.json();
+  if(d.ok){ toast('Email settings saved','success'); loadEmailConfig(); }
+  else toast('Save failed: '+(d.error||'Unknown'),'error');
+}
+
+async function sendTestEmail(){
+  const to = document.getElementById('test-to').value.trim();
+  if(!to){ toast('Enter a test recipient email address','warning'); return; }
+  const res = document.getElementById('test-result');
+  res.style.display=''; res.style.color='var(--muted)'; res.textContent='Sending…';
+  const r = await fetch('/api/email-config/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to})});
+  const d = await r.json();
+  if(d.ok){
+    res.style.color='var(--green)'; res.textContent='✅ Test email sent! Check your inbox.';
+    toast('Test email sent successfully','success');
+  } else {
+    res.style.color='var(--red)'; res.textContent='❌ '+(d.error||'Failed');
+    toast('Email failed: '+(d.error||'Error'),'error');
+  }
+}
+
+function toggleGuide(){
+  const body = document.getElementById('guide-body');
+  const arr  = document.getElementById('guide-arrow');
+  if(body.style.display==='none'){ body.style.display=''; arr.textContent='▲ Hide'; }
+  else { body.style.display='none'; arr.textContent='▼ Show'; }
+}
+
+/* ─── RECIPIENTS ─── */
+async function loadRecipients(){
+  if(!isAdmin) return;
+  const r = await fetch('/api/alert-recipients'); const recs = await r.json();
+  const el = document.getElementById('reclist');
+  if(!recs.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:4px 0;">No recipients yet — click <strong>+ Add Email</strong> to add addresses that will receive security alerts.</div>';
+    return;
+  }
+  el.innerHTML = recs.map(rec=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);">
+      <span style="flex:1;font-size:13px;font-weight:500;">${rec.email}</span>
+      <span style="font-size:11px;color:var(--muted);background:var(--bg);padding:2px 8px;border-radius:4px;">Alerts: ${rec.severity_filter||'all'}</span>
+      <button class="btn btn-d btn-sm" onclick="delRecipient(${rec.id})">Remove</button>
+    </div>`).join('');
+}
+
+async function addRecipient(){
+  const email = document.getElementById('rec-email').value.trim();
+  if(!email){ toast('Enter an email address','warning'); return; }
+  const r = await fetch('/api/alert-recipients',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email, severity_filter:document.getElementById('rec-sev').value})});
+  const d = await r.json();
+  if(d.ok){ closeModal('recModal'); loadRecipients(); document.getElementById('rec-email').value=''; toast('Recipient added','success'); }
+  else toast(d.error||'Failed','error');
+}
+
+async function delRecipient(id){
+  await fetch(`/api/alert-recipients/${id}`,{method:'DELETE'});
+  loadRecipients(); toast('Recipient removed','success');
+}
+
+/* ─── USERS ─── */
+async function loadUsers(){
+  if(!isAdmin) return;
+  const r = await fetch('/api/users'); const users = await r.json();
+  document.getElementById('utbody').innerHTML = users.map(u=>`
+    <tr>
+      <td style="display:flex;align-items:center;gap:8px;font-weight:500;">
+        <div style="width:28px;height:28px;border-radius:50%;background:${u.role==='admin'?'#ef4444':u.role==='auditor'?'#f59e0b':'#8b5cf6'};
+          display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">${u.username[0].toUpperCase()}</div>
+        ${u.username}
+      </td>
+      <td style="font-size:12px;color:var(--muted);">${u.email}</td>
+      <td><select class="fs" style="width:110px;padding:4px 8px;font-size:12px;" onchange="updateRole(${u.id},this.value)" ${u.username==='admin'?'disabled':''}>
+        ${['viewer','auditor','admin'].map(rr=>`<option value="${rr}" ${u.role===rr?'selected':''}>${rr.charAt(0).toUpperCase()+rr.slice(1)}</option>`).join('')}
+      </select></td>
+      <td style="font-size:12px;color:var(--muted);">${u.last_login?new Date(u.last_login).toLocaleString():'Never'}</td>
+      <td>${u.username!=='admin'?`<button class="btn btn-d btn-sm" onclick="delUser(${u.id})">Delete</button>`:''}</td>
+    </tr>`).join('');
+}
+
+async function createUser(){
+  const r = await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:document.getElementById('nu-u').value,email:document.getElementById('nu-e').value,
+      password:document.getElementById('nu-p').value,role:document.getElementById('nu-r').value})});
+  const d = await r.json();
+  if(d.ok){ closeModal('nuModal'); loadUsers(); toast('User created','success'); }
+  else toast(d.error||'Failed','error');
+}
+
+async function updateRole(uid,role){
+  await fetch(`/api/users/${uid}/role`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({role})});
+  toast('Role updated','success'); loadUsers();
+}
+
+async function delUser(uid){
+  if(!confirm('Delete this user?')) return;
+  const r = await fetch(`/api/users/${uid}`,{method:'DELETE'}); const d = await r.json();
+  if(d.ok){ loadUsers(); toast('User deleted','success'); } else toast(d.error||'Error','error');
+}
+
+/* ─── COMPLIANCE RULES ─── */
+async function loadRules(){
+  const r = await fetch('/api/rules'); allRules = await r.json(); renderRules(allRules);
+}
+function renderRules(rules){
+  document.getElementById('rtbody').innerHTML = rules.map(r=>`
+    <tr>
+      <td><span class="badge b-medium">${r.framework}</span></td>
+      <td class="mono">${r.control_id}</td>
+      <td style="font-weight:500;font-size:12px;">${r.title}</td>
+      <td style="font-size:12px;">${r.check_type}</td>
+      <td><span class="badge b-${r.severity}">${r.severity}</span></td>
+      <td><label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRule(${r.id},this.checked)">
+        <span style="font-size:12px;">${r.enabled?'On':'Off'}</span>
+      </label></td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-s btn-sm" onclick="editRule(${r.id})">Edit</button>
+        ${isAdmin?`<button class="btn btn-d btn-sm" onclick="delRule(${r.id})">Del</button>`:''}
+      </td>
+    </tr>`).join('');
+}
+function fwFilt(fw,btn){ document.querySelectorAll('.fwb').forEach(b=>b.classList.remove('active','btn-p')); btn.classList.add('active','btn-p'); renderRules(fw==='ALL'?allRules:allRules.filter(r=>r.framework===fw)); }
+function srRules(q){ q=q.toLowerCase(); renderRules(allRules.filter(r=>r.title.toLowerCase().includes(q)||r.control_id.toLowerCase().includes(q))); }
+function resetRule(){ editRuleId=null; document.getElementById('rmtitle').textContent='New Compliance Rule'; ['r-id','r-cid','r-title','r-desc'].forEach(id=>document.getElementById(id).value=''); document.getElementById('r-fw').value='ISO27001'; document.getElementById('r-ct').value='policy'; document.getElementById('r-sev').value='medium'; }
+function editRule(id){ const r=allRules.find(x=>x.id===id); if(!r)return; editRuleId=id; document.getElementById('rmtitle').textContent='Edit Rule'; document.getElementById('r-id').value=id; document.getElementById('r-fw').value=r.framework; document.getElementById('r-cid').value=r.control_id; document.getElementById('r-title').value=r.title; document.getElementById('r-desc').value=r.description; document.getElementById('r-ct').value=r.check_type; document.getElementById('r-sev').value=r.severity; openModal('ruleModal'); }
+async function saveRule(){ const payload={framework:document.getElementById('r-fw').value,control_id:document.getElementById('r-cid').value,title:document.getElementById('r-title').value,description:document.getElementById('r-desc').value,check_type:document.getElementById('r-ct').value,severity:document.getElementById('r-sev').value}; const url=editRuleId?`/api/rules/${editRuleId}`:'/api/rules'; const r=await fetch(url,{method:editRuleId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); const d=await r.json(); if(d.ok){closeModal('ruleModal');loadRules();toast(editRuleId?'Rule updated':'Rule created','success');}else toast('Failed','error'); }
+async function delRule(id){ if(!confirm('Delete rule?'))return; await fetch(`/api/rules/${id}`,{method:'DELETE'}); loadRules(); toast('Deleted','success'); }
+async function toggleRule(id,e){ await fetch(`/api/rules/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:e})}); }
+
+// Init
+if(isAdmin){ initEmailUI(); loadRecipients(); loadUsers(); }
+loadRules();
+</script>
+{% endblock %}
