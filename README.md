@@ -1,108 +1,72 @@
-# 🦅 FalconX – Enterprise Security Audit System (ESAS)
+# FalconX – Enterprise Security Audit System
 
-FalconX is a **full-stack, enterprise-grade security auditing platform** inspired by the *Enterprise Security Audit System (ESAS)* project. It is designed to automate **governance, risk and compliance (GRC)** checks along with **vulnerability scanning** across complex, hybrid enterprise IT environments.
+FalconX is an enterprise-oriented security audit platform designed to help identify web application vulnerabilities, perform security checks, and support compliance-oriented assessments.
 
-The platform transforms traditional, manual security audits into a **continuous, rule-based, and data-driven process**, enabling organizations to proactively manage risk, ensure regulatory compliance and strengthen their overall security posture.
+## Key Features
 
-> **Automate audits. Enforce compliance. Reduce enterprise risk.**
+- Web application security scanning
+- OWASP-focused vulnerability checks
+- Security and compliance auditing
+- Vulnerability reporting
+- Cloud/security assessment support
+- Modular architecture for extending security checks
 
----
+## Tech Stack
 
-## 🚀 Project Overview
+- Python
+- Web application security tooling
+- OWASP security concepts
+- Cloud security concepts
 
-Modern enterprises operate across **on-premise infrastructure, cloud platforms and distributed applications**, significantly increasing their attack surface. Traditional audit mechanisms are manual, slow and provide only point-in-time visibility.
+## Getting Started
 
-FalconX addresses these challenges by providing:
+### 1. Clone the repository
 
-* Automated data collection from enterprise systems
-* Rule-based compliance validation against recognized frameworks
-* Integrated vulnerability scanning
-* Centralized dashboards and audit-ready reports
+```bash
+git clone https://github.com/<your-username>/falconx.git
+cd falconx
+```
 
-The system is architected with **scalability, transparency and enterprise security operations** in mind, closely mirroring real-world SOC and GRC workflows.
+### 2. Create a virtual environment
 
----
+```bash
+python -m venv venv
+```
 
-## 🎯 Objectives
+Activate it:
 
-* Enable **continuous enterprise security auditing**
-* Automate compliance validation against **ISO 27001 and NIST**
-* Detect vulnerabilities, misconfigurations and policy violations
-* Reduce manual audit effort and operational overhead
-* Provide audit-ready reports and traceable security evidence
+**Windows**
+```bash
+venv\Scripts\activate
+```
 
----
+**Linux/macOS**
+```bash
+source venv/bin/activate
+```
 
-## 🧠 Core Capabilities
+### 3. Install dependencies
 
-### 🔐 Governance, Risk & Compliance (GRC)
+If the project contains a `requirements.txt` file:
 
-* Rule-based compliance engine aligned with ISO 27001 & NIST
-* Detection of configuration deviations and policy violations
-* Immutable audit trails for accountability and transparency
-* Audit-ready reporting for internal and external reviews
+```bash
+pip install -r requirements.txt
+```
 
-### 🛡 Vulnerability Scanning
+### 4. Run the project
 
-* Automated vulnerability assessment using integrated scanners
-* Identification of insecure services, exposed ports and weaknesses
-* Severity-based risk categorization
-* Repeatable scans to track remediation progress
+Use the project's main entry point or follow the application-specific instructions included in the source files.
 
-### 📊 Enterprise Dashboards & Reporting
+## Project Structure
 
-* Real-time compliance scores and risk indicators
-* Centralized dashboard for auditors and administrators
-* Exportable audit reports (PDF / CSV)
-* Historical trend analysis for compliance posture
+The repository is organized around the existing FalconX source code and supporting assets. Generated files and local development artifacts have been excluded from this GitHub-ready version.
 
-### 🔑 Identity & Access Control
+## Security & Responsible Use
 
-* JWT-based authentication
-* Role-Based Access Control (RBAC): Admin, Auditor, Viewer
-* Secure access to sensitive audit data
+FalconX is intended for authorized security testing, defensive security research, and educational purposes. Only scan systems and applications for which you have explicit permission.
 
----
+## Author
 
-## 🏗 System Architecture (High Level)
+Rohit Chavhan
 
-FalconX follows a **modular, enterprise-ready architecture**:
-
-* **Data Collection Layer** – APIs, logs, scanners
-* **Compliance Engine** – Rule-based validation logic
-* **Vulnerability Scanner** – OpenVAS or equivalent integration
-* **Backend Services** – Secure REST APIs and audit orchestration
-* **Frontend Dashboard** – Visualization and reporting
-* **Audit Storage** – Immutable logs and compliance records
-
-This design ensures scalability, maintainability and ease of integration with existing enterprise tools.
-
----
-
-## 🧪 Usage
-
-* Configure compliance rules in `compliance/`
-* Initiate audits from the admin dashboard
-* Run vulnerability scans on registered systems
-* Monitor compliance status and risk scores
-* Export audit-ready reports for review
-
-FalconX prioritizes **actionable insights** over raw scan output.
-
----
-
-## 📖 Learning & Enterprise Value
-
-This project demonstrates:
-
-* Enterprise security auditing workflows
-* Practical GRC implementation
-* Automated vulnerability management
-* Secure full-stack application development
-* SOC-aligned reporting and dashboards
-
----
-
-
-
-**🦅 FalconX – See what others miss. Secure what matters.**
+Cybersecurity | Network Security | Ethical Hacking
